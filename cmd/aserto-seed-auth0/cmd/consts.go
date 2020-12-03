@@ -2,12 +2,9 @@ package cmd
 
 const (
 	flagInputFile  = "input"
-	aliasInputFile = "i"
 	usageInputFile = "input file"
 	flagDryRun     = "dryrun"
-	aliasDryRun    = "d"
-	usageDryRun    = "dryrun (no execute)"
+	usageDryRun    = "dryrun (do not execute)"
 	flagSpew       = "spew"
-	aliasSpew      = "s"
 	usageSpew      = "spew"
 )

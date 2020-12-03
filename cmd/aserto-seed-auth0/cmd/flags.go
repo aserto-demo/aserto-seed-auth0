@@ -6,7 +6,7 @@ import "github.com/urfave/cli/v2"
 func InputFileFlag() cli.Flag {
 	return &cli.PathFlag{
 		Name:     flagInputFile,
-		Aliases:  []string{aliasInputFile},
+		Aliases:  []string{},
 		Usage:    usageInputFile,
 		Required: true,
 	}

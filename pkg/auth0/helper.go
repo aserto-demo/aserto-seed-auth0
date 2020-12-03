@@ -8,8 +8,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync/atomic"
 
+	"github.com/aserto-demo/aserto-seed-auth0/pkg/config"
+	"github.com/aserto-demo/aserto-seed-auth0/pkg/counter"
 	"github.com/aserto-demo/aserto-seed-auth0/pkg/csv"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/auth0.v4"
@@ -18,83 +19,74 @@ import (
 
 const (
 	objectTypeUser  = "user"
+	finalCount      = 0
 	counterInterval = 10
 )
 
-// Helper -.
-type Helper struct {
-	inputfile    string
-	domain       string
-	clientID     string
-	clientSecret string
-	emailDomain  string
-	setPassword  string
-	mgnt         *management.Management
-	identityMap  map[string]string
-	spew         bool
-	exec         bool
-	counter      Counter
+// Manager -.
+type Manager struct {
+	config      *config.Config
+	inputfile   string
+	mgnt        *management.Management
+	identityMap map[string]string
+	spew        bool
+	exec        bool
+	counter     counter.Counter
 }
 
-// NewHelper -.
-func NewHelper(filename string) *Helper {
-	seeder := Helper{
-		inputfile:    filename,
-		domain:       os.Getenv("AUTH0_DOMAIN"),
-		clientID:     os.Getenv("AUTH0_CLIENT_ID"),
-		clientSecret: os.Getenv("AUTH0_CLIENT_SECRET"),
-		emailDomain:  os.Getenv("EMAIL_DOMAIN"),
-		setPassword:  os.Getenv("SET_PASSWORD"),
-		identityMap:  make(map[string]string),
-		exec:         true,
-		counter:      Counter{},
+// NewManager -.
+func NewManager(cfg *config.Config, filename string) *Manager {
+	seeder := Manager{
+		config:      cfg,
+		inputfile:   filename,
+		identityMap: make(map[string]string),
+		exec:        true,
+		counter:     counter.Counter{},
 	}
 	return &seeder
 }
 
 // Init -.
-func (h *Helper) Init() error {
-	if err := h.loadIdentityMap(); err != nil {
+func (m *Manager) Init() error {
+	if err := m.loadIdentityMap(); err != nil {
 		return fmt.Errorf("%w", err)
 	}
 
 	mgnt, err := management.New(
-		h.domain,
+		m.config.Auth0.Domain,
 		management.WithClientCredentials(
-			h.clientID,
-			h.clientSecret,
+			m.config.Auth0.ClientID,
+			m.config.Auth0.ClientSecret,
 		),
 	)
 	if err != nil {
 		return fmt.Errorf("%w", err)
 	}
 
-	h.mgnt = mgnt
+	m.mgnt = mgnt
 
 	return nil
 }
 
 // Spew -.
-func (h *Helper) Spew(f bool) {
-	h.spew = f
+func (m *Manager) Spew(f bool) {
+	m.spew = f
 }
 
 // Dryrun -.
-func (h *Helper) Dryrun(f bool) {
-	h.exec = !f
+func (m *Manager) Dryrun(f bool) {
+	m.exec = !f
 }
 
 // Seed -.
-func (h *Helper) Seed() error {
+func (m *Manager) Seed() error {
 	cr := csv.NewCsvReader()
-	if err := cr.Open(h.inputfile); err != nil {
+	if err := cr.Open(m.inputfile); err != nil {
 		return err
 	}
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-
-	corporationRole := strings.Split(h.emailDomain, ".")[0]
 
 	for {
 		if err := cr.Read(); err == io.EOF {
@@ -105,78 +97,39 @@ func (h *Helper) Seed() error {
 
 		// if not a user object skip to next
 		if s := cr.Get("ObjectClass"); s != objectTypeUser {
-			h.counter.AddSkipped()
+			m.counter.IncrSkipped()
 			continue
 		}
 
-		id := cr.GetToLower("ObjectGUID")
+		u := m.makeUser(cr)
 
-		email := formatEmail(cr.GetToLower("mail"), h.emailDomain)
-
-		u := management.User{
-			ID:            auth0.String(id),
-			Connection:    auth0.String("Username-Password-Authentication"),
-			Email:         auth0.String(email),
-			EmailVerified: auth0.Bool(true),
-			GivenName:     auth0.String(cr.Get("GivenName")),
-			FamilyName:    auth0.String(cr.Get("sn")),
-			Nickname:      auth0.String(cr.Get("Name")),
-			Password:      auth0.String(h.setPassword),
-			UserMetadata:  make(map[string]interface{}),
-			AppMetadata:   make(map[string]interface{}),
-			Picture:       auth0.String(picURL(cr.Get("Name"))),
+		if m.spew {
+			_ = enc.Encode(u)
 		}
 
-		u.UserMetadata["phone"] = formatPhone(cr.Get("OfficePhone"))
-		u.UserMetadata["title"] = cr.Get("Title")
-		u.UserMetadata["department"] = cr.Get("Department")
-		u.UserMetadata["manager"] = h.identityMap[cr.GetToLower("Manager")]
-		u.UserMetadata["username"] = cr.GetToLower("SamAccountName")
-
-		departmentRole := strings.ReplaceAll(cr.GetToLower("Department"), " ", "-")
-		u.AppMetadata["roles"] = [...]string{"user", corporationRole, departmentRole}
-
-		if val := cr.GetToLower("DistinguishedName"); val != "" {
-			u.UserMetadata["dn"] = val
-		}
-
-		if h.spew {
-			_ = enc.Encode(&u)
-		}
-
-		if h.exec {
-			if h.userExists(id) {
-				u.ID = nil
-				u.Password = nil
-				logrus.Infof("update user_id: %s\n", "auth0|"+id)
-				if err := h.mgnt.User.Update("auth0|"+id, &u); err != nil {
-					h.counter.AddError()
-					logrus.Error(err)
-					continue
-				}
-			} else {
-				logrus.Infof("create user_id: %s\n", "auth0|"+id)
-				if err := h.mgnt.User.Create(&u); err != nil {
-					h.counter.AddError()
-					logrus.Error(err)
-					continue
-				}
+		if m.userExists(*u.ID) {
+			if err := m.updateUser(*u.ID, u); err != nil {
+				continue
+			}
+		} else {
+			if err := m.createUser(*u.ID, u); err != nil {
+				continue
 			}
 		}
 
-		h.counter.AddRow()
-		h.counter.Print(counterInterval)
+		m.counter.IncrRows()
+		m.counter.Print(counterInterval)
 	}
 
-	h.counter.Print(0) // final count
+	m.counter.Print(finalCount)
 
 	return nil
 }
 
 // Reset -.
-func (h *Helper) Reset() error {
+func (m *Manager) Reset() error {
 	cr := csv.NewCsvReader()
-	if err := cr.Open(h.inputfile); err != nil {
+	if err := cr.Open(m.inputfile); err != nil {
 		return err
 	}
 
@@ -189,40 +142,121 @@ func (h *Helper) Reset() error {
 
 		// if not a user object skip to next
 		if cr.Get("ObjectClass") != objectTypeUser {
-			h.counter.AddSkipped()
+			m.counter.IncrSkipped()
 			continue
 		}
 
 		id := cr.GetToLower("ObjectGUID")
 
-		if h.exec {
-			if h.userExists(id) {
-				if err := h.mgnt.User.Delete("auth0|" + id); err != nil {
-					h.counter.AddError()
-					logrus.Error(err)
-				}
-			}
+		if err := m.deleteUser(id); err != nil {
+			continue
 		}
 
-		h.counter.AddRow()
-		h.counter.Print(counterInterval)
+		m.counter.IncrRows()
+		m.counter.Print(counterInterval)
 	}
 
-	h.counter.Print(0) // final count
+	m.counter.Print(finalCount)
 
 	return nil
 }
 
-func (h *Helper) userExists(id string) bool {
-	if _, err := h.mgnt.User.Read("auth0|" + id); err != nil {
+func (m *Manager) makeUser(cr *csv.Reader) *management.User {
+	id := cr.GetToLower("ObjectGUID")
+
+	email := formatEmail(cr.GetToLower("mail"), m.config.EmailDomain)
+
+	u := management.User{
+		ID:            auth0.String(id),
+		Connection:    auth0.String("Username-Password-Authentication"),
+		Email:         auth0.String(email),
+		EmailVerified: auth0.Bool(true),
+		GivenName:     auth0.String(cr.Get("GivenName")),
+		FamilyName:    auth0.String(cr.Get("sn")),
+		Nickname:      auth0.String(cr.Get("Name")),
+		Password:      auth0.String(m.config.SetPassword),
+		UserMetadata:  make(map[string]interface{}),
+		AppMetadata:   make(map[string]interface{}),
+		Picture:       auth0.String(picURL(cr.Get("Name"))),
+	}
+
+	u.UserMetadata["phone"] = formatPhone(cr.Get("OfficePhone"))
+	u.UserMetadata["title"] = cr.Get("Title")
+	u.UserMetadata["department"] = cr.Get("Department")
+	u.UserMetadata["manager"] = m.identityMap[cr.GetToLower("Manager")]
+	u.UserMetadata["username"] = cr.GetToLower("SamAccountName")
+
+	corporationRole := strings.Split(m.config.EmailDomain, ".")[0]
+	departmentRole := strings.ReplaceAll(cr.GetToLower("Department"), " ", "-")
+	u.AppMetadata["roles"] = [...]string{"user", corporationRole, departmentRole}
+
+	if val := cr.GetToLower("DistinguishedName"); val != "" {
+		u.UserMetadata["dn"] = val
+	}
+
+	return &u
+}
+
+func (m *Manager) userExists(id string) bool {
+	if _, err := m.mgnt.User.Read("auth0|" + id); err != nil {
 		return false
 	}
 	return true
 }
 
-func (h *Helper) loadIdentityMap() error {
+func (m *Manager) createUser(id string, u *management.User) error {
+	logrus.Debugf("createUser: %s\n", "auth0|"+id)
+	if !m.exec {
+		return nil
+	}
+
+	if err := m.mgnt.User.Create(u); err != nil {
+		m.counter.IncrError()
+		logrus.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) updateUser(id string, u *management.User) error {
+	logrus.Debugf("updateUser: %s\n", "auth0|"+id)
+	if !m.exec {
+		return nil
+	}
+
+	// reset fields which cannot be changed
+	u.ID = nil
+	u.Password = nil
+
+	if err := m.mgnt.User.Update("auth0|"+id, u); err != nil {
+		m.counter.IncrError()
+		logrus.Error(err)
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) deleteUser(id string) error {
+	if !m.exec {
+		return nil
+	}
+
+	if m.userExists(id) {
+		if err := m.mgnt.User.Delete("auth0|" + id); err != nil {
+			m.counter.IncrError()
+			logrus.Error(err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) loadIdentityMap() error {
 	cr := csv.NewCsvReader()
-	if err := cr.Open(h.inputfile); err != nil {
+	if err := cr.Open(m.inputfile); err != nil {
 		return err
 	}
 
@@ -239,18 +273,18 @@ func (h *Helper) loadIdentityMap() error {
 		}
 
 		id := cr.GetToLower("ObjectGUID")
-		h.identityMap[id] = id
+		m.identityMap[id] = id
 
 		if val := cr.GetToLower("mail"); val != "" {
-			h.identityMap[val] = id
+			m.identityMap[val] = id
 		}
 
 		if val := cr.GetToLower("DistinguishedName"); val != "" {
-			h.identityMap[val] = id
+			m.identityMap[val] = id
 		}
 
 		if val := cr.GetToLower("UserPrincipalName"); val != "" {
-			h.identityMap[val] = id
+			m.identityMap[val] = id
 		}
 	}
 
@@ -283,46 +317,4 @@ func picURL(s string) string {
 	}
 
 	return u.String()
-}
-
-// Counter - accumulator for row, skipped and error counts.
-type Counter struct {
-	rowCounter  int32
-	skipCounter int32
-	errCounter  int32
-}
-
-// AddRow - increase row counter.
-func (c *Counter) AddRow() {
-	atomic.AddInt32(&c.rowCounter, 1)
-}
-
-// AddSkipped - increase skipped row counter.
-func (c *Counter) AddSkipped() {
-	atomic.AddInt32(&c.skipCounter, 1)
-}
-
-// AddError - increase error counter.
-func (c *Counter) AddError() {
-	atomic.AddInt32(&c.errCounter, 1)
-}
-
-// Print - print counter at interval % m.
-func (c *Counter) Print(m int32) {
-	// i := m
-	linefeed := ""
-
-	if m == 0 {
-		linefeed = "\n"
-		m = 1
-	}
-
-	if d := c.rowCounter % m; d == 0 {
-		fmt.Fprintf(os.Stdout, "\033[2K\rrow count: %d skip count %d error count: %d%s",
-			c.rowCounter,
-			c.skipCounter,
-			c.errCounter,
-			linefeed,
-		)
-	}
 }
