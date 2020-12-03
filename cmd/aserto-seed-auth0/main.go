@@ -1,64 +1,42 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 
-	"github.com/aserto-demo/aserto-seed-auth0/pkg/auth0"
-	ver "github.com/aserto-demo/aserto-seed-auth0/pkg/version"
-
+	"github.com/aserto-demo/aserto-seed-auth0/cmd/aserto-seed-auth0/cmd"
+	"github.com/aserto-demo/aserto-seed-auth0/pkg/version"
 	_ "github.com/joho/godotenv/autoload"
-	flag "github.com/spf13/pflag"
+	"github.com/urfave/cli/v2"
+)
+
+const (
+	appName  = "aserto-seed-auth0"
+	appUsage = "seed Auth0 user set"
 )
 
 func main() {
-	var (
-		seed    *bool   = flag.Bool("seed", false, "seed")
-		reset   *bool   = flag.Bool("reset", false, "reset")
-		spew    *bool   = flag.Bool("spew", false, "spew")
-		dryrun  *bool   = flag.Bool("dryrun", false, "dryrun")
-		version *bool   = flag.Bool("version", false, "version")
-		input   *string = flag.String("input", "", "inputfile")
-	)
+	log.SetOutput(ioutil.Discard)
 
-	flag.Parse()
-
-	if *version {
-		fmt.Printf("%s\n", ver.GetInfo().String())
-
-		return
+	app := cli.NewApp()
+	app.Name = appName
+	app.Usage = appUsage
+	app.HideVersion = true
+	app.Version = version.GetInfo().String()
+	app.Flags = []cli.Flag{}
+	app.Commands = []*cli.Command{
+		cmd.SeedCommand(),
+		cmd.ResetCommand(),
+		cmd.VersionCommand(),
 	}
 
-	if input == nil || *input == "" {
-		fmt.Printf("--input not set\n")
+	ctx := context.Background()
 
-		return
-	}
-
-	helper := auth0.NewHelper(*input)
-	if err := helper.Init(); err != nil {
-		fmt.Printf("error %+v\n", err)
-
-		return
-	}
-
-	helper.Spew(*spew)
-	helper.Dryrun(*dryrun)
-
-	switch {
-	case *seed:
-		if err := helper.Seed(); err != nil {
-			fmt.Printf("error %+v\n", err)
-		}
-		return
-
-	case *reset:
-		if err := helper.Reset(); err != nil {
-			fmt.Printf("error %+v\n", err)
-		}
-		return
-
-	default:
-		fmt.Printf("no valid arguments passed in")
-		return
+	if err := app.RunContext(ctx, os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "error %v\n", err)
+		os.Exit(1)
 	}
 }

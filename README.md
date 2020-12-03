@@ -5,27 +5,28 @@ A simple tool for populating users in an Auth0 domain.
 ##Configuration
 The tool requires a .env file contain configuration information for Auth0 as well as some additional settings. 
 
-A template .env file is available in the root of the source repository.
+A [.env.template](https://raw.githubusercontent.com/aserto-demo/aserto-seed-auth0/main/.env.template) .env file is available in the root of the source repository. Copy the file to .env and adjust the values accordingly.
 
 .env file 
 
-    AUTH0_DOMAIN="mydomain.us.auth0.com"
-    AUTH0_CLIENT_ID="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    AUTH0_CLIENT_SECRET="yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+	AUTH0_DOMAIN="mydomain.us.auth0.com"
+	AUTH0_CLIENT_ID="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	AUTH0_CLIENT_SECRET="yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
 	EMAIL_DOMAIN="acmecorp.com"
-	SET_PASSWORD="V@erySec#re123!"
+	SET_PASSWORD="V@erySec#ret321!"
 
 
 ##Tool options
 
 Command line options:
 
-	Usage of ./bin/aserto-seed-auth0:
-      --input string   inputfile
-      --reset          reset
-      --seed           seed
-      --spew           spew
-      --version        version
+	Usage of aserto-seed-auth0:
+		--dryrun         dryrun
+		--input string   inputfile
+		--reset          reset
+		--seed           seed
+		--spew           spew
+		--version        version
 	
 
 #Seed
