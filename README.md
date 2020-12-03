@@ -20,25 +20,32 @@ A [.env.template](https://raw.githubusercontent.com/aserto-demo/aserto-seed-auth
 
 Command line options:
 
-	Usage of aserto-seed-auth0:
-		--dryrun         dryrun
-		--input string   inputfile
-		--reset          reset
-		--seed           seed
-		--spew           spew
-		--version        version
-	
+	> aserto-seed-auth0 --help
+
+	NAME:
+	aserto-seed-auth0 - seed Auth0 user data
+
+	USAGE:
+	main [global options] command [command options] [arguments...]
+
+	COMMANDS:
+	seed     seed
+	reset    reset
+	version  display verion information
+
+	GLOBAL OPTIONS:
+	--help, -h  show help (default: false)
 
 #Seed
 
 The seed data file used, resides in the [aserto-demo/contoso-ad-sample](https://github.com/aserto-demo/contoso-ad-sample) repository and provides a dataset of 272 users. 
 
-	aserto-seed-auth0 --input ./data/ADUsers.csv --seed
+	aserto-seed-auth0 seed --input ./data/ADUsers.csv
 	
 
 Seed with output:
 
-	aserto-seed-auth0 --input ./data/ADUsers.csv --seed --spew
+	aserto-seed-auth0 seed --input ./data/ADUsers.csv --spew --dryrun
 	
 Spew output:
 
@@ -75,5 +82,5 @@ Reset, will remove the all users from the seed input file from the user domain, 
 
 **NOTE:** Any user not in the seed input file will not be removed or changed.
 
-	aserto-seed-auth0 --input ./data/ADUsers.csv --reset
+	aserto-seed-auth0 reset --input ./data/ADUsers.csv
 	

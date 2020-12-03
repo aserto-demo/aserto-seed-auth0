@@ -15,7 +15,7 @@ import (
 
 const (
 	appName  = "aserto-seed-auth0"
-	appUsage = "seed Auth0 user set"
+	appUsage = "seed Auth0 user data"
 )
 
 func main() {
@@ -25,6 +25,7 @@ func main() {
 	app.Name = appName
 	app.Usage = appUsage
 	app.HideVersion = true
+	app.HideHelpCommand = true
 	app.Version = version.GetInfo().String()
 	app.Flags = []cli.Flag{}
 	app.Commands = []*cli.Command{
