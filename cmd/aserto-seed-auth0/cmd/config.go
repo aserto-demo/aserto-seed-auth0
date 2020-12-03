@@ -13,7 +13,7 @@ import (
 func configRetriever(c *cli.Context) error {
 	cfg := config.FromEnv()
 
-	c.Context = context.WithValue(c.Context, config.Key(), &cfg)
+	c.Context = context.WithValue(c.Context, config.Key(), cfg)
 
 	return nil
 }

@@ -6,6 +6,12 @@ import (
 	"sync/atomic"
 )
 
+const (
+	Init = int32(-1)
+	Last = int32(-2)
+	zero = int32(0)
+)
+
 // Counter - accumulator for row, skipped and error counts.
 type Counter struct {
 	rowCounter  int32
@@ -32,9 +38,14 @@ func (c *Counter) IncrError() {
 func (c *Counter) Print(m int32) {
 	linefeed := ""
 
-	if m == 0 {
-		linefeed = "\n"
+	switch m {
+	case zero:
 		m = 1 // avoid divide by zero
+	case Init:
+		m = 1
+	case Last:
+		m = 1
+		linefeed = "\n"
 	}
 
 	if d := c.rowCounter % m; d == 0 {

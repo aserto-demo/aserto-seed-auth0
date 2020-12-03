@@ -19,8 +19,7 @@ import (
 
 const (
 	objectTypeUser  = "user"
-	finalCount      = 0
-	counterInterval = 10
+	counterInterval = 1
 )
 
 // Manager -.
@@ -88,6 +87,8 @@ func (m *Manager) Seed() error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 
+	m.counter.Print(counter.Init)
+
 	for {
 		if err := cr.Read(); err == io.EOF {
 			break
@@ -121,7 +122,7 @@ func (m *Manager) Seed() error {
 		m.counter.Print(counterInterval)
 	}
 
-	m.counter.Print(finalCount)
+	m.counter.Print(counter.Last)
 
 	return nil
 }
@@ -132,6 +133,8 @@ func (m *Manager) Reset() error {
 	if err := cr.Open(m.inputfile); err != nil {
 		return err
 	}
+
+	m.counter.Print(counter.Init)
 
 	for {
 		if err := cr.Read(); err == io.EOF {
@@ -156,7 +159,7 @@ func (m *Manager) Reset() error {
 		m.counter.Print(counterInterval)
 	}
 
-	m.counter.Print(finalCount)
+	m.counter.Print(counter.Last)
 
 	return nil
 }
@@ -198,6 +201,11 @@ func (m *Manager) makeUser(cr *csv.Reader) *management.User {
 }
 
 func (m *Manager) userExists(id string) bool {
+	logrus.Debugf("userExists: %s\n", "auth0|"+id)
+	if !m.exec {
+		return true
+	}
+
 	if _, err := m.mgnt.User.Read("auth0|" + id); err != nil {
 		return false
 	}

@@ -13,10 +13,8 @@
             "cwd": "${workspaceFolder}",
             "env": {},
             "args": [
-                "seed",
-                "--input", "${workspaceFolder}/data/ADUsers.csv",
-                "--spew",
-                "--dryrun"
+                "reset",
+                "--input", "${workspaceFolder}/data/ADUsers.csv"
             ]
         }
     ]
