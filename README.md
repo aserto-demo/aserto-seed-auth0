@@ -52,7 +52,7 @@ Spew output:
 	{
 	  "user_id": "b7de08a6-8417-491b-be62-85945a538f46",
 	  "connection": "Username-Password-Authentication",
-	  "email": "danj@acmecorp.com",
+	  "email": "danj@contoso.com",
 	  "given_name": "Dan",
 	  "family_name": "Jump",
 	  "nickname": "Dan Jump",
