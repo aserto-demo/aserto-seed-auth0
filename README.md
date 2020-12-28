@@ -12,7 +12,7 @@ A [.env.template](https://raw.githubusercontent.com/aserto-demo/aserto-seed-auth
 	AUTH0_DOMAIN="mydomain.us.auth0.com"
 	AUTH0_CLIENT_ID="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 	AUTH0_CLIENT_SECRET="yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
-	EMAIL_DOMAIN="acmecorp.com"
+	EMAIL_DOMAIN="contoso.com"
 	SET_PASSWORD="V@erySec#ret321!"
 
 
