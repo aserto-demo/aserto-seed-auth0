@@ -10,5 +10,5 @@ require (
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3 // indirect
 	gopkg.in/auth0.v4 v4.7.0
-	gopkg.in/auth0.v5 v5.4.0
+	gopkg.in/auth0.v5 v5.11.0
 )
